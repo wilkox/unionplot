@@ -12,13 +12,37 @@ Data <- OTUTable[which(OTUTable$Sample == levels(OTUTable$Sample)[1]), ]
 Centre <- c(50,50)
 Max.radius <- 20
 
-#Return the ring and index for datum n
-place.datum <- function(n) {
-  Ring <- floor(log(((n + 4) / 6), 2)) + 2
-  Index <- n - abs(((2 ^ (Ring - 2) - 1) * 6) + 2) + 1
-  return(data.frame(Ring = Ring, Index = Index))
+#Return the capacity of ring r
+ring.capacity <- function(r) {
+  if (r == 0) {
+    return(1) 
+  } else if (r == 1) {
+    return(6) 
+  } else {
+    return(2 * ring.capacity(r - 1))  
+  }
 }
 
+#Return the cartesian coordinates for datum n
+place.datum <- function(n) {
+
+  #Get ring and index within ring
+  Ring <- floor(log(((n + 4) / 6), 2)) + 1
+  Index <- n - abs(((2 ^ (Ring - 1) - 1) * 6) + 2)
+
+  #Convert to cartesian coordinates
+  r <- Ring
+  phi <- (2 * pi * Index) / ring.capacity(Ring)
+  x <- r * cos(phi)
+  y <- r * sin(phi)
+
+  return(data.frame(x = x, y = y))
+}
+
+Data <- ldply(1:500, place.datum)
+Data$n <- factor(1:500)
+Plot <- ggplot(Data, aes(x = x, y = y, colour = n)) + geom_point()
+Plot
 
 draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", SizeFactor = "RelativeAbundance") {
   
