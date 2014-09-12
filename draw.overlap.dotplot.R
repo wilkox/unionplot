@@ -12,37 +12,43 @@ Data <- OTUTable[which(OTUTable$Sample == levels(OTUTable$Sample)[1]), ]
 Centre <- c(50,50)
 Max.radius <- 20
 
-#Return the capacity of ring r
-ring.capacity <- function(r) {
-  if (r == 0) {
-    return(1) 
-  } else if (r == 1) {
-    return(6) 
+#Return coordinates for i circles, with hexagonal pack layout
+place.circles <- function(i) {
+
+  #Determine 'degree' of pack i.e. how many rings
+  # Example:
+  #
+  #      O O O
+  #     O O O O 
+  #    O O O O O
+  #     O O O O 
+  #      O O O
+  #
+  # (19 circles) has degree = 3 (three rings, three circles on each side)
+  #
+  # The number of circles in each ring (excluding the innermost) proceeds
+  #  as an arithmetic progression: 6, 12, 18...
+  # The cumulative number of circles is the sum of the progression
+  #  i.e. an arithmetic series: 6, 18, 30 ...
+  # So, the ith circle is the sum of the arithmetic progression, plus change.
+  # The sum of the first n terms in an arithmetic progression is given by:
+  #
+  #         n(a_1 + a_n)
+  # S_n =  --------------
+  #               2
+  #
+  # So we rearrange and solve for n with the quadratic equation.
+
+  if (i == 1) {
+    Degree = 1  
   } else {
-    return(2 * ring.capacity(r - 1))  
+    Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
+
+  return(Degree)
+
 }
 
-#Return the cartesian coordinates for datum n
-place.datum <- function(n) {
-
-  #Get ring and index within ring
-  Ring <- floor(log(((n + 4) / 6), 2)) + 1
-  Index <- n - abs(((2 ^ (Ring - 1) - 1) * 6) + 2)
-
-  #Convert to cartesian coordinates
-  r <- Ring
-  phi <- (2 * pi * Index) / ring.capacity(Ring)
-  x <- r * cos(phi)
-  y <- r * sin(phi)
-
-  return(data.frame(x = x, y = y))
-}
-
-Data <- ldply(1:500, place.datum)
-Data$n <- factor(1:500)
-Plot <- ggplot(Data, aes(x = x, y = y, colour = n)) + geom_point()
-Plot
 
 draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", SizeFactor = "RelativeAbundance") {
   
