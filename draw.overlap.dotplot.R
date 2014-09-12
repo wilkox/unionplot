@@ -19,12 +19,13 @@ place.circles <- function(i) {
   # Example:
   #
   #      O O O
-  #     O O O O 
-  #    O O O O O
-  #     O O O O 
-  #      O O O
+  #     . O O O 
+  #    . O O O O
+  #     . O O O 
+  #      . O O
   #
-  # (19 circles) has degree = 3 (three rings, three circles on each side)
+  # (15 circles) has degree = 3 (three rings, three circles on each side; 
+  #  outermost ring is not full, with dots marking the empty spaces)
   #
   # The number of circles in each ring (excluding the innermost) proceeds
   #  as an arithmetic progression: 6, 12, 18...
@@ -37,7 +38,8 @@ place.circles <- function(i) {
   # S_n =  --------------
   #               2
   #
-  # So we rearrange and solve for n with the quadratic equation.
+  # So we rearrange and solve for n with the quadratic equation (with a few
+  # trimmings to account for the innermost ring and 1-indexing)
 
   if (i == 1) {
     Degree = 1  
@@ -45,7 +47,33 @@ place.circles <- function(i) {
     Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
 
-  return(Degree)
+  #Place the points in a rastering fashing from bottom to top
+  # Bottom row has Degree points, middle has 2Degree + 1, total 2Degree + 1 rows
+  points.in.row <- function(Row, Degree) {
+    if (Row > Degree) {
+      return(points.in.row((2 * Degree) - Row, Degree))
+    } else {
+      return(Degree + Row - 1)
+    }
+  }
+  Points <- data.frame(x = numeric(), y = numeric()) 
+  Row <- 1
+  Position <- 1
+  for (j in 1:i) {
+
+    x <- Position - Degree + (points.in.row(Degree, Degree) - points.in.row(Row, Degree)) / 2
+    y <- Row - Degree
+    Points <- rbind(Points, data.frame(x = x, y = y))
+
+    if (Position == points.in.row(Row, Degree)) {
+      Row <- Row + 1 
+      Position <- 1
+    } else {
+      Position <- Position + 1
+    }
+  }
+
+  return(Points)
 
 }
 
