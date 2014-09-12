@@ -57,7 +57,7 @@ place.circles <- function(i) {
     }
   }
   Points <- data.frame(x = numeric(), y = numeric()) 
-  Row <- 1
+  Row <- Degree
   Position <- 1
   for (j in 1:i) {
 
@@ -66,7 +66,13 @@ place.circles <- function(i) {
     Points <- rbind(Points, data.frame(x = x, y = y))
 
     if (Position == points.in.row(Row, Degree)) {
-      Row <- Row + 1 
+      if (Row == Degree) {
+        Row <- Row + 1 
+      } else if (Row > Degree) {
+        Row <- (2 * Degree) - Row
+      } else {
+        Row <- (2 * Degree) - Row + 1
+      }
       Position <- 1
     } else {
       Position <- Position + 1
