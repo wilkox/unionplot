@@ -138,11 +138,12 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
 
   #Coordinates for the centres of each region in the Venn diagram
   # (A, B, C) are the three group factor levels
-  # H stores the height of the equilateral triangle with C at its apex
-  H <- sqrt(120000)
-  #             A  B    C    AB   AC     BC     ABC
-  RegionsX <- c(0, 400, 200, 200, 100  , 300  , 200  )
-  RegionsY <- c(0, 0  , H  , 0  , H / 2, H / 2, H / 3)
+  # Triangle has A bottom left, B bottom right, C apex
+  L <- 20 #The length of one side of the triangle
+  H <- sqrt((L ^ 2) - ((L / 2) ^ 2)) # The height of the triangle
+  #             A  B  C        AB       AC       BC            ABC
+  RegionsX <- c(0, L, (L / 2), (L / 2), (L / 4), ((3 * L) / 4), (L / 2))
+  RegionsY <- c(0, 0, H      , 0      , H / 2  , H / 2        , H / 3  )
   names(RegionsX) <- names(Overlaps)
   names(RegionsY) <- names(Overlaps)
 
@@ -165,21 +166,24 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
 
   #Routine to generate points for a circle
   # From http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
-  make.circle <- function(Centre = c(0,0), Radius = 1) {
+  make.circle <- function(Centre) {
     t <- seq(0, 2 * pi, length.out = 100)
-    x <- Centre[1] + Radius * cos(t)
-    y <- Centre[2] + Radius * sin(t)
+    x <- Centre[1] + ((2 * L) / 3) * cos(t)
+    y <- Centre[2] + ((2 * L) / 3) * sin(t)
     return(data.frame(x = x, y = y))
   }
 
   #Generate geom_path circles for the three group factor levels
   make.region.circle <- function(Region) {
-    Circle <- make.circle(c(RegionsX[Region], RegionsY[Region]), 300)
+    Circle <- make.circle(c(RegionsX[Region], RegionsY[Region]))
     return(geom_path(data = Circle, mapping = aes(x = x, y = y), colour = "black"))
   }
 
   Plot <- ggplot(Overlaps, aes_string(x = "x", y = "y", colour = ColourFactor))
   Plot <- Plot + geom_point()
   Plot <- Plot + make.region.circle(1) + make.region.circle(2) + make.region.circle(3)
+  Plot
+
+  return(Overlaps)
 
 }
