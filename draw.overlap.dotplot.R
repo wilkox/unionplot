@@ -1,19 +1,5 @@
-#Load OTU table and prepare
-OTUTable <- read.tidy("../residences_project/picked_OTUs_winter_forward/final_otu_table_mc2_w_taxonomy.clean.tidy.txt")
-OTUTable <- OTUTable[which(OTUTable$OTU %in% levels(OTUTable$OTU)[1:1000]), ]
-Samples <- read.tidy("../residences_project/samples/samples.txt")[c("Sample", "Type")]
-OTUTable <- merge(OTUTable, Samples, by = "Sample", all.x = TRUE)
-
-GroupFactor <- "Type"
-ColourFactor <- "Phylum"
-SizeFactor <- "RelativeAbundance"
-
-Data <- OTUTable[which(OTUTable$Sample == levels(OTUTable$Sample)[1]), ]
-Centre <- c(50,50)
-Max.radius <- 20
-
-#Return coordinates for i circles, with hexagonal pack layout
-place.circles <- function(i) {
+#Return coordinates for i points, with hexagonal pack layout
+place.points <- function(i) {
 
   #Determine 'degree' of pack i.e. how many rings
   # Example:
@@ -24,31 +10,34 @@ place.circles <- function(i) {
   #     . O O O 
   #      . O O
   #
-  # (15 circles) has degree = 3 (three rings, three circles on each side; 
+  # (15 points) has degree = 3 (three rings, three points on each side; 
   #  outermost ring is not full, with dots marking the empty spaces)
   #
-  # The number of circles in each ring (excluding the innermost) proceeds
+  # The number of points in each ring (excluding the innermost) proceeds
   #  as an arithmetic progression: 6, 12, 18...
-  # The cumulative number of circles is the sum of the progression
+  # The cumulative number of points is the sum of the progression
   #  i.e. an arithmetic series: 6, 18, 30 ...
-  # So, the ith circle is the sum of the arithmetic progression, plus change.
+  # So, the ith point is the sum of the arithmetic progression, plus change,
+  #  where the number of terms is the number of rings less one
   # The sum of the first n terms in an arithmetic progression is given by:
   #
-  #         n(a_1 + a_n)
-  # S_n =  --------------
-  #               2
+  #                   n(a_1 + a_n)
+  #           S_n =  --------------
+  #                         2
   #
-  # So we rearrange and solve for n with the quadratic equation (with a few
-  # trimmings to account for the innermost ring and 1-indexing)
+  #  where a_j is the value of the jth term.
+  # So we rearrange and solve for n with the quadratic equation(with a few
+  #  trimmings to account for the innermost ring and 1-indexing)
 
   if (i == 1) {
-    Degree = 1  
+    Degree <- 1
   } else {
     Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
 
-  #Place the points in a rastering fashing from bottom to top
-  # Bottom row has Degree points, middle has 2Degree + 1, total 2Degree + 1 rows
+  #Place the points in a rastering fashing from the middle outwards
+  # Bottom row has Degree points, middle has 2Degree + 1, there are 
+  # 2Degree + 1 rows in total
   points.in.row <- function(Row, Degree) {
     if (Row > Degree) {
       return(points.in.row((2 * Degree) - Row, Degree))
@@ -83,8 +72,16 @@ place.circles <- function(i) {
 
 }
 
+#Load OTU table and prepare
+OTUTable <- read.tidy("../residences_project/picked_OTUs_winter_forward/final_otu_table_mc2_w_taxonomy.clean.tidy.txt")
+OTUTable <- OTUTable[which(OTUTable$OTU %in% levels(OTUTable$OTU)[1:1000]), ]
+Samples <- read.tidy("../residences_project/samples/samples.txt")[c("Sample", "Type")]
+OTUTable <- merge(OTUTable, Samples, by = "Sample", all.x = TRUE)
 
-draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", SizeFactor = "RelativeAbundance") {
+GroupFactor <- "Type"
+ColourFactor <- "Phylum"
+
+draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum") {
   
   #For each group, generate list of OTUs in that group
   GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU))
@@ -115,8 +112,12 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
       Diff <- setdiff(Intersection, unlist(GroupOTUs[-(which(names(GroupOTUs) %in% Groups))]))
     }
 
+    #Add colour factor
+    Overlap <- data.frame(OTU = Diff)
+    Overlap <- unique(merge(Overlap, OTUTable[c("OTU", ColourFactor)], by = "OTU", all.x = TRUE))
+
     #Return list
-    return(Diff)
+    return(Overlap)
   }
 
   #Generate all combinations for the group factor
@@ -125,5 +126,60 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
 
   #Get lists of overlaps for the group factor
   Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
+  names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", ")))
+
+  #Add point coordinates to overlaps
+  add.coordinates <- function(Overlap) {
+    Points <- place.points(nrow(Overlap))
+    Overlap <- cbind(Overlap, Points)
+    return(Overlap)
+  }
+  Overlaps <- llply(Overlaps, add.coordinates)
+
+  #Coordinates for the centres of each region in the Venn diagram
+  # (A, B, C) are the three group factor levels
+  # H stores the height of the equilateral triangle with C at its apex
+  H <- sqrt(120000)
+  #             A  B    C    AB   AC     BC     ABC
+  RegionsX <- c(0, 400, 200, 200, 100  , 300  , 200  )
+  RegionsY <- c(0, 0  , H  , 0  , H / 2, H / 2, H / 3)
+  names(RegionsX) <- names(Overlaps)
+  names(RegionsY) <- names(Overlaps)
+
+  #Routine to transform point coordinates for each set of overlap points
+  # to the correct location
+  transform.points <- function(OverlapName) {
+
+    Overlap <- Overlaps[[OverlapName]]
+
+    x <- RegionsX[OverlapName]
+    y <- RegionsY[OverlapName]
+
+    Overlap$x <- Overlap$x + x
+    Overlap$y <- Overlap$y + y
+    Overlap$Overlap <- rep(OverlapName, nrow(Overlap))
+
+    return(Overlap)
+  }
+  Overlaps <- ldply(names(Overlaps), transform.points)
+
+  #Routine to generate points for a circle
+  # From http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
+  make.circle <- function(Centre = c(0,0), Radius = 1) {
+    t <- seq(0, 2 * pi, length.out = 100)
+    x <- Centre[1] + Radius * cos(t)
+    y <- Centre[2] + Radius * sin(t)
+    return(data.frame(x = x, y = y))
+  }
+
+  #Generate geom_path circles for the three group factor levels
+  make.region.circle <- function(Region) {
+    Circle <- make.circle(c(RegionsX[Region], RegionsY[Region]), 300)
+    return(geom_path(data = Circle, mapping = aes(x = x, y = y), colour = "black"))
+  }
+
+  Plot <- ggplot(Overlaps, aes_string(x = "x", y = "y", colour = ColourFactor))
+  Plot <- Plot + geom_point()
+  Plot <- Plot + make.region.circle(1) + make.region.circle(2) + make.region.circle(3)
 
 }
