@@ -61,13 +61,7 @@ rotate.odd.r <- function(Points, Rotations = 1) {
     
 }
 
-Trap <- place.points.trapezoid(39, 5)
-Trap <- rotate.odd.r(Trap, 4)
-Trap <- convert.odd.r.to.cartesian(Trap)
-qplot(x = x, y = y, data = Trap)
-
-
-#Return coordinates for i points, with hexagonal pack layout
+#Return cartesian coordinates for i points, with hexagonal pack layout
 place.points.hexagon <- function(i) {
 
   #Determine 'degree' of pack i.e. how many rings
@@ -103,6 +97,8 @@ place.points.hexagon <- function(i) {
   } else {
     Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
+
+  Degree <- degree(i)
 
   #Place the points in a rastering fashing from the middle outwards
   # Bottom row has Degree points, middle has 2Degree + 1, there are 
@@ -208,65 +204,106 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     Degree <- floor((-3 + sqrt(9 + (12 * (nrow(Overlaps[[7]]) - 2)))) / 6) + 2
   }
 
-  #Function to rotate and translate a trapezoid
-  rotate.translate.trapezoid <- function(Points, Centre = c(0, 0), Rotation = 0) {
-
-    #Rotate
-    # Method: convert to hex coordinate system (i.e. subtract 0.5 from odd-numbered rows)
-    # Perform rotation with method: http://gamedev.stackexchange.com/a/55493
-    # Convert back to cartesian
-    Points$x <- ifelse(Points$y %% 2 == 1, Points$x - 0.5, Points$x)
-    xx <- Points$x - (Points$y - (Points$y %% 2)) / 2
-    zz <- Points$y
-    yy <- -xx - zz
-    xx <- -yy
-    yy <- -zz
-    zz <- -xx
-    xRot <- xx + (zz - (zz %% 2)) / 2
-    yRot <- zz
-    xRot <- ifelse(yRot %% 2 == 1, xRot + 0.5, xRot)
-    Points$x <- xRot
-    Points$y <- yRot
-
-    #Transform
-    Points$x <- Points$x + Centre[1]
-    Points$y <- Points$y + Centre[2]
-    
-    return(Points)
-    
-  }
-  Trap <- place.points.trapezoid(59, 5)
-  Trap <- rotate.translate.trapezoid(Trap, Centre = c(0,0), Rotation = 1)
-  qplot(x = x, y = y, data = Trap)
-
   #Place the centre hexagon
   Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
 
+  #Routine to generate a trapezoid
+  make.trapezoid <- function(OverlapIndex, BaseRow, Offset = c(0,0)) {
+    Trap <- place.points.trapezoid(nrow(Overlaps[[OverlapIndex]]), BaseRow)
+    Trap <- convert.odd.r.to.cartesian(Trap)
+    Trap$x <- Trap$x + Offset[1]
+    Trap$y <- Trap$y + Offset[2]
+    Trap <- cbind(Overlaps[[OverlapIndex]], Trap)
+    return(Trap)
+  }
+
   #Place the top trapezoid
   Trap <- place.points.trapezoid(nrow(Overlaps[[1]]), Degree)
-  x <- 0.5 - (0.5 * Degree)
-  y <- Degree + 1
-  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = 0)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x + 0.5 - (0.5 * Degree)
+  Trap$y <- Trap$y + Degree + 1
   Trap <- cbind(Overlaps[[1]], Trap)
   Points <- rbind(Points, Trap)
 
   #Place the bottom right trapezoid
   Trap <- place.points.trapezoid(nrow(Overlaps[[2]]), Degree - 2)
-  x <- Degree + 0.5
-  y <- -1
-  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = ((2 / 3) * pi))
+  Trap <- rotate.odd.r(Trap, 4)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x + Degree + 0.5
+  Trap$y <- Trap$y - 1
   Trap <- cbind(Overlaps[[2]], Trap)
   Points <- rbind(Points, Trap)
   
   #Place the bottom left trapezoid
   Trap <- place.points.trapezoid(nrow(Overlaps[[3]]), Degree - 2)
-  x <- 0 - (Degree / 2) - 1
-  y <- 0 - Degree + 2
-  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = ((4 / 3) * pi))
+  Trap <- rotate.odd.r(Trap, 2)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x - (Degree / 2) - 2
+  Trap$y <- Trap$y - Degree + 2
   Trap <- cbind(Overlaps[[3]], Trap)
   Points <- rbind(Points, Trap)
 
+  #Place the top right trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[4]]), Degree - 2)
+  Trap <- rotate.odd.r(Trap, 5)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x + (Degree / 2) + 2
+  Trap$y <- Trap$y + Degree - 2
+  Trap <- cbind(Overlaps[[4]], Trap)
+  Points <- rbind(Points, Trap)
 
-  qplot(x = x, y = y, colour = Phylum, data = Points)
+  #Place the bottom trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[6]]), Degree)
+  Trap <- rotate.odd.r(Trap, 3)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x - 0.5 + (Degree / 2)
+  Trap$y <- Trap$y - Degree - 1
+  Trap <- cbind(Overlaps[[6]], Trap)
+  Points <- rbind(Points, Trap)
+
+  #Place the top left trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[5]]), Degree - 2)
+  Trap <- rotate.odd.r(Trap, 1)
+  Trap <- convert.odd.r.to.cartesian(Trap)
+  Trap$x <- Trap$x - Degree - 1
+  Trap$y <- Trap$y + 1
+  Trap <- cbind(Overlaps[[5]], Trap)
+  Points <- rbind(Points, Trap)
+
+  Points <- Bak
+
+  #Draw dividing lines
+  #Main hex
+  Hex <- data.frame(
+    q = c(
+      ((-Degree / 2) - 1),
+      (Degree / 2),
+      (Degree),
+      (Degree / 2),
+      ((-Degree / 2) - 1),
+      (-Degree),
+      ((-Degree / 2) - 1)
+    ),
+    r = c(
+      (Degree),
+      (Degree),
+      (0),
+      (- Degree),
+      (-Degree),
+      (0),
+      (Degree) 
+    )
+  )
+  Hex <- convert.odd.r.to.cartesian(Hex)
+
+  #To draw the dividing lines, we need to know the number of rows in
+  # the largest trapezoid
+  trap.rows <- function()
+
+  Plot <- ggplot(Points, aes(x = x, y = y))
+  Plot <- Plot + geom_point(aes(colour = Phylum))
+  Plot <- Plot + geom_path(data = Hex)
+  Plot <- Plot + theme_classic()
+  Plot
 
 }
