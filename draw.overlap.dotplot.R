@@ -84,7 +84,7 @@ ColourFactor <- "Phylum"
 draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum") {
   
   #For each group, generate list of OTUs in that group
-  GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU))
+  GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU), .progress = "time")
 
   #Routine to determine intersection of >2 vectors
   deep.intersect <- function(List) {
@@ -116,17 +116,20 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     Overlap <- data.frame(OTU = Diff)
     Overlap <- unique(merge(Overlap, OTUTable[c("OTU", ColourFactor)], by = "OTU", all.x = TRUE))
 
+    #Sort by colour factor
+    Overlap <- Overlap[order(Overlap[ColourFactor]), ]
+
     #Return list
     return(Overlap)
   }
 
   #Generate all combinations for the group factor
   Groups <- levels(OTUTable[[GroupFactor]])
-  Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE)))
+  Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE), .progress = "time"))
 
   #Get lists of overlaps for the group factor
   Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
-  names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", ")))
+  names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
 
   #Add point coordinates to overlaps
   add.coordinates <- function(Overlap) {
@@ -134,18 +137,69 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     Overlap <- cbind(Overlap, Points)
     return(Overlap)
   }
-  Overlaps <- llply(Overlaps, add.coordinates)
+  Overlaps <- llply(Overlaps, add.coordinates, .progress = "time")
 
   #Coordinates for the centres of each region in the Venn diagram
   # (A, B, C) are the three group factor levels
   # Triangle has A bottom left, B bottom right, C apex
-  L <- 20 #The length of one side of the triangle
-  H <- sqrt((L ^ 2) - ((L / 2) ^ 2)) # The height of the triangle
-  #             A  B  C        AB       AC       BC            ABC
-  RegionsX <- c(0, L, (L / 2), (L / 2), (L / 4), ((3 * L) / 4), (L / 2))
-  RegionsY <- c(0, 0, H      , 0      , H / 2  , H / 2        , H / 3  )
+  # Triangle starts equilateral but is warped by the relative sizes
+  #  of the different groups
+
+  L <- 20 # Base length for one side of the triangle
+  M <- 100 # Base count for points in a group
+
+  RegionsX <- numeric(length = 7)
+  names(RegionsX) <- c("A", "B", "C", "AB", "AC", "BC", "ABC")
+  RegionsY <- numeric(length = 7)
+  names(RegionsY) <- c("A", "B", "C", "AB", "AC", "BC", "ABC")
+  CirclesX <- numeric(length = 7)
+  names(CirclesX) <- c("A", "B", "C")
+  CirclesY <- numeric(length = 7)
+  names(CirclesY) <- c("A", "B", "C")
+
+  #A
+  AWeight <- (nrow(Overlaps[[1]]) + nrow(Overlaps[[4]]) + nrow(Overlaps[[5]])) / M
+  RegionsX["A"] <- 0 - ((L / 2) * AWeight)
+  RegionsY["A"] <- 0 - ((L / 2) * AWeight)
+  CirclesX["A"] <- 0 - ((L / 3) * AWeight)
+  CirclesY["A"] <- 0 - ((L / 3) * AWeight)
+
+  #B
+  BWeight <- (nrow(Overlaps[[2]]) + nrow(Overlaps[[4]]) + nrow(Overlaps[[6]])) / M
+  RegionsX["B"] <- L + ((L / 2) * BWeight)
+  RegionsY["B"] <- L - ((L / 2) * BWeight)
+  CirclesX["B"] <- L + ((L / 3) * BWeight)
+  CirclesY["B"] <- L - ((L / 3) * BWeight)
+
+  #C
+  CWeight <- (nrow(Overlaps[[3]]) + nrow(Overlaps[[5]]) + nrow(Overlaps[[6]])) / M
+  RegionsX["C"] <- L / 2
+  RegionsY["C"] <- sqrt((L^2) - ((L / 2)^2)) + ((L / 2) * CWeight)
+  CirclesX["C"] <- L / 3
+  CirclesY["C"] <- sqrt((L^2) - ((L / 2)^2)) + ((L / 3) * CWeight)
+
+  #AB
+  RegionsX["AB"] <- mean(c(RegionsX["A"], RegionsX["B"]))
+  RegionsY["AB"] <- mean(c(RegionsY["A"], RegionsY["B"]))
+  
+  #AC
+  RegionsX["AC"] <- mean(c(RegionsX["A"], RegionsX["C"]))
+  RegionsY["AC"] <- mean(c(RegionsY["A"], RegionsY["C"]))
+
+  #BC
+  RegionsX["BC"] <- mean(c(RegionsX["B"], RegionsX["C"]))
+  RegionsY["BC"] <- mean(c(RegionsY["B"], RegionsY["C"]))
+
+  #ABC
+  RegionsX["ABC"] <- mean(c(RegionsX["A"], RegionsX["B"], RegionsX["C"]))
+  RegionsY["ABC"] <- mean(c(RegionsY["A"], RegionsY["B"], RegionsY["C"]))
+
   names(RegionsX) <- names(Overlaps)
   names(RegionsY) <- names(Overlaps)
+
+  Radii <- c(AWeight, BWeight, CWeight)
+  Radii <- Radii * L * 0.6
+  names(Radii) <- c("A", "B", "C")
 
   #Routine to transform point coordinates for each set of overlap points
   # to the correct location
@@ -162,28 +216,25 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
 
     return(Overlap)
   }
-  Overlaps <- ldply(names(Overlaps), transform.points)
-
-  #Routine to generate points for a circle
-  # From http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
-  make.circle <- function(Centre) {
-    t <- seq(0, 2 * pi, length.out = 100)
-    x <- Centre[1] + ((2 * L) / 3) * cos(t)
-    y <- Centre[2] + ((2 * L) / 3) * sin(t)
-    return(data.frame(x = x, y = y))
-  }
+  Overlaps <- ldply(names(Overlaps), transform.points, .progress = "time")
 
   #Generate geom_path circles for the three group factor levels
+  # From http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
   make.region.circle <- function(Region) {
-    Circle <- make.circle(c(RegionsX[Region], RegionsY[Region]))
+
+    t <- seq(0, 2 * pi, length.out = 100)
+    x <- CirclesX[Region] + (Radii[Region] * cos(t))
+    y <- CirclesY[Region] + (Radii[Region] * sin(t))
+    Circle <- data.frame(x = x, y = y)
     return(geom_path(data = Circle, mapping = aes(x = x, y = y), colour = "black"))
   }
 
   Plot <- ggplot(Overlaps, aes_string(x = "x", y = "y", colour = ColourFactor))
-  Plot <- Plot + geom_point()
-  Plot <- Plot + make.region.circle(1) + make.region.circle(2) + make.region.circle(3)
-  Plot
+  Plot <- Plot + geom_point(size = 1)
+#  Plot <- Plot + make.region.circle(1) + make.region.circle(2) + make.region.circle(3)
+  Plot <- Plot + theme_minimal()
+  print(Plot)
 
-  return(Overlaps)
+  return(Plot)
 
 }
