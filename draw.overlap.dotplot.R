@@ -1,17 +1,18 @@
-#Return coordinates for i points, in trapezoidal layout with p points
+#Return coordinates for n points, in trapezoidal layout with p points
 # in bottom row
-place.points.trapezoid <- function(i, p) {
+#Indexing is hex, odd-r
+place.points.trapezoid <- function(n, p) {
 
-  Points <- data.frame(x = numeric(), y = numeric()) 
+  Points <- data.frame(q = numeric(), r = numeric()) 
   Row <- 1
   Position <- 1
 
-  for (j in 1:i) {
+  for (j in 1:n) {
 
-    y <- Row - 1
-    x <- Position - (Row / 2) - 0.5
+    q <- Position - floor(Row / 2) - 1
+    r <- Row - 1
 
-    Points <- rbind(Points, data.frame(x = x, y = y))
+    Points <- rbind(Points, data.frame(r = r, q = q))
 
     if (Position == (p + Row - 1)) {
       Row <- Row + 1
@@ -25,6 +26,46 @@ place.points.trapezoid <- function(i, p) {
   return(Points)
   
 }
+
+#Convert a hex grid in odd-r indexing to cartesian coordinates
+convert.odd.r.to.cartesian <- function(Points) {
+  Points$x <- ifelse(Points$r %% 2 == 0, Points$q, Points$q + 0.5)
+  Points$y <- Points$r
+  Points$q <- NULL
+  Points$r <- NULL
+  return(Points)
+}
+
+#Rotate a hex grid in odd-r indexing
+rotate.odd.r <- function(Points, Rotations = 1) {
+
+  if (!Rotations == 1) {
+    Points <- rotate.odd.r(Points, Rotations = Rotations - 1)
+  }
+  
+  #Convert to cubic
+  x <- Points$q - (Points$r - (Points$r %% 2)) / 2
+  z <- Points$r
+  y <- -x-z
+
+  #Rotate
+  xx <- -z
+  yy <- -x
+  zz <- -y
+
+  #Convert back to odd-r
+  Points$q <- xx + (zz - (zz %% 2)) / 2
+  Points$r <- zz
+
+  return(Points)
+    
+}
+
+Trap <- place.points.trapezoid(39, 5)
+Trap <- rotate.odd.r(Trap, 4)
+Trap <- convert.odd.r.to.cartesian(Trap)
+qplot(x = x, y = y, data = Trap)
+
 
 #Return coordinates for i points, with hexagonal pack layout
 place.points.hexagon <- function(i) {
@@ -167,21 +208,23 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     Degree <- floor((-3 + sqrt(9 + (12 * (nrow(Overlaps[[7]]) - 2)))) / 6) + 2
   }
 
-  #Function to rotate and transform a trapezoid
-  rotate.transform.trapezoid <- function(Points, Centre = c(0, 0), Angle = 0) {
-
-    #Unless the angle is 0 or pi, need to convert unit length
-    # to hyptotenuse
-    if (! Angle %in% c(0, pi)) {
-      h <- sqrt((0.5 ^ 2) + 1)  
-      Points$x <- Points$x * h
-      Points$y <- Points$y * h
-    }
+  #Function to rotate and translate a trapezoid
+  rotate.translate.trapezoid <- function(Points, Centre = c(0, 0), Rotation = 0) {
 
     #Rotate
-    # Using constants beca
-    xRot <- (Points$x * cos(Angle)) + (Points$y * sin(Angle))
-    yRot <- (Points$y * cos(Angle)) - (Points$x * sin(Angle))
+    # Method: convert to hex coordinate system (i.e. subtract 0.5 from odd-numbered rows)
+    # Perform rotation with method: http://gamedev.stackexchange.com/a/55493
+    # Convert back to cartesian
+    Points$x <- ifelse(Points$y %% 2 == 1, Points$x - 0.5, Points$x)
+    xx <- Points$x - (Points$y - (Points$y %% 2)) / 2
+    zz <- Points$y
+    yy <- -xx - zz
+    xx <- -yy
+    yy <- -zz
+    zz <- -xx
+    xRot <- xx + (zz - (zz %% 2)) / 2
+    yRot <- zz
+    xRot <- ifelse(yRot %% 2 == 1, xRot + 0.5, xRot)
     Points$x <- xRot
     Points$y <- yRot
 
@@ -192,6 +235,9 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     return(Points)
     
   }
+  Trap <- place.points.trapezoid(59, 5)
+  Trap <- rotate.translate.trapezoid(Trap, Centre = c(0,0), Rotation = 1)
+  qplot(x = x, y = y, data = Trap)
 
   #Place the centre hexagon
   Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
