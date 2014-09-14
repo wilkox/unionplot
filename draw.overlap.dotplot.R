@@ -8,7 +8,7 @@ place.points.trapezoid <- function(i, p) {
 
   for (j in 1:i) {
 
-    y <- Row
+    y <- Row - 1
     x <- Position - (Row / 2) - 0.5
 
     Points <- rbind(Points, data.frame(x = x, y = y))
@@ -159,9 +159,6 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
   names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
 
-  #Place the centre hexagon
-  Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
-
   #We need the degree of the centre hexagon to know where to place the
   # surrounding trapazoids
   if (nrow(Overlaps[[7]]) == 1) {
@@ -182,6 +179,7 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     }
 
     #Rotate
+    # Using constants beca
     xRot <- (Points$x * cos(Angle)) + (Points$y * sin(Angle))
     yRot <- (Points$y * cos(Angle)) - (Points$x * sin(Angle))
     Points$x <- xRot
@@ -195,13 +193,34 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     
   }
 
+  #Place the centre hexagon
+  Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
+
   #Place the top trapezoid
   Trap <- place.points.trapezoid(nrow(Overlaps[[1]]), Degree)
   x <- 0.5 - (0.5 * Degree)
-  y <- Degree
+  y <- Degree + 1
   Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = 0)
   Trap <- cbind(Overlaps[[1]], Trap)
   Points <- rbind(Points, Trap)
+
+  #Place the bottom right trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[2]]), Degree - 2)
+  x <- Degree + 0.5
+  y <- -1
+  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = ((2 / 3) * pi))
+  Trap <- cbind(Overlaps[[2]], Trap)
+  Points <- rbind(Points, Trap)
+  
+  #Place the bottom left trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[3]]), Degree - 2)
+  x <- 0 - (Degree / 2) - 1
+  y <- 0 - Degree + 2
+  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = ((4 / 3) * pi))
+  Trap <- cbind(Overlaps[[3]], Trap)
+  Points <- rbind(Points, Trap)
+
+
   qplot(x = x, y = y, colour = Phylum, data = Points)
 
 }
