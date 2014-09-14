@@ -1,5 +1,33 @@
+#Return coordinates for i points, in trapezoidal layout with p points
+# in bottom row
+place.points.trapezoid <- function(i, p) {
+
+  Points <- data.frame(x = numeric(), y = numeric()) 
+  Row <- 1
+  Position <- 1
+
+  for (j in 1:i) {
+
+    y <- Row
+    x <- Position - (Row / 2) - 0.5
+
+    Points <- rbind(Points, data.frame(x = x, y = y))
+
+    if (Position == (p + Row - 1)) {
+      Row <- Row + 1
+      Position <- 1
+    } else {
+      Position <- Position + 1
+    }
+    
+  }
+
+  return(Points)
+  
+}
+
 #Return coordinates for i points, with hexagonal pack layout
-place.points <- function(i) {
+place.points.hexagon <- function(i) {
 
   #Determine 'degree' of pack i.e. how many rings
   # Example:
@@ -131,110 +159,49 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
   names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
 
-  #Add point coordinates to overlaps
-  add.coordinates <- function(Overlap) {
-    Points <- place.points(nrow(Overlap))
-    Overlap <- cbind(Overlap, Points)
-    return(Overlap)
-  }
-  Overlaps <- llply(Overlaps, add.coordinates, .progress = "time")
+  #Place the centre hexagon
+  Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
 
-  #Coordinates for the centres of each region in the Venn diagram
-  # (A, B, C) are the three group factor levels
-  # Triangle has A bottom left, B bottom right, C apex
-  # Triangle starts equilateral but is warped by the relative sizes
-  #  of the different groups
-
-  L <- 20 # Base length for one side of the triangle
-  M <- 100 # Base count for points in a group
-
-  RegionsX <- numeric(length = 7)
-  names(RegionsX) <- c("A", "B", "C", "AB", "AC", "BC", "ABC")
-  RegionsY <- numeric(length = 7)
-  names(RegionsY) <- c("A", "B", "C", "AB", "AC", "BC", "ABC")
-  CirclesX <- numeric(length = 7)
-  names(CirclesX) <- c("A", "B", "C")
-  CirclesY <- numeric(length = 7)
-  names(CirclesY) <- c("A", "B", "C")
-
-  #A
-  AWeight <- (nrow(Overlaps[[1]]) + nrow(Overlaps[[4]]) + nrow(Overlaps[[5]])) / M
-  RegionsX["A"] <- 0 - ((L / 2) * AWeight)
-  RegionsY["A"] <- 0 - ((L / 2) * AWeight)
-  CirclesX["A"] <- 0 - ((L / 3) * AWeight)
-  CirclesY["A"] <- 0 - ((L / 3) * AWeight)
-
-  #B
-  BWeight <- (nrow(Overlaps[[2]]) + nrow(Overlaps[[4]]) + nrow(Overlaps[[6]])) / M
-  RegionsX["B"] <- L + ((L / 2) * BWeight)
-  RegionsY["B"] <- L - ((L / 2) * BWeight)
-  CirclesX["B"] <- L + ((L / 3) * BWeight)
-  CirclesY["B"] <- L - ((L / 3) * BWeight)
-
-  #C
-  CWeight <- (nrow(Overlaps[[3]]) + nrow(Overlaps[[5]]) + nrow(Overlaps[[6]])) / M
-  RegionsX["C"] <- L / 2
-  RegionsY["C"] <- sqrt((L^2) - ((L / 2)^2)) + ((L / 2) * CWeight)
-  CirclesX["C"] <- L / 3
-  CirclesY["C"] <- sqrt((L^2) - ((L / 2)^2)) + ((L / 3) * CWeight)
-
-  #AB
-  RegionsX["AB"] <- mean(c(RegionsX["A"], RegionsX["B"]))
-  RegionsY["AB"] <- mean(c(RegionsY["A"], RegionsY["B"]))
-  
-  #AC
-  RegionsX["AC"] <- mean(c(RegionsX["A"], RegionsX["C"]))
-  RegionsY["AC"] <- mean(c(RegionsY["A"], RegionsY["C"]))
-
-  #BC
-  RegionsX["BC"] <- mean(c(RegionsX["B"], RegionsX["C"]))
-  RegionsY["BC"] <- mean(c(RegionsY["B"], RegionsY["C"]))
-
-  #ABC
-  RegionsX["ABC"] <- mean(c(RegionsX["A"], RegionsX["B"], RegionsX["C"]))
-  RegionsY["ABC"] <- mean(c(RegionsY["A"], RegionsY["B"], RegionsY["C"]))
-
-  names(RegionsX) <- names(Overlaps)
-  names(RegionsY) <- names(Overlaps)
-
-  Radii <- c(AWeight, BWeight, CWeight)
-  Radii <- Radii * L * 0.6
-  names(Radii) <- c("A", "B", "C")
-
-  #Routine to transform point coordinates for each set of overlap points
-  # to the correct location
-  transform.points <- function(OverlapName) {
-
-    Overlap <- Overlaps[[OverlapName]]
-
-    x <- RegionsX[OverlapName]
-    y <- RegionsY[OverlapName]
-
-    Overlap$x <- Overlap$x + x
-    Overlap$y <- Overlap$y + y
-    Overlap$Overlap <- rep(OverlapName, nrow(Overlap))
-
-    return(Overlap)
-  }
-  Overlaps <- ldply(names(Overlaps), transform.points, .progress = "time")
-
-  #Generate geom_path circles for the three group factor levels
-  # From http://stackoverflow.com/questions/6862742/draw-a-circle-with-ggplot2
-  make.region.circle <- function(Region) {
-
-    t <- seq(0, 2 * pi, length.out = 100)
-    x <- CirclesX[Region] + (Radii[Region] * cos(t))
-    y <- CirclesY[Region] + (Radii[Region] * sin(t))
-    Circle <- data.frame(x = x, y = y)
-    return(geom_path(data = Circle, mapping = aes(x = x, y = y), colour = "black"))
+  #We need the degree of the centre hexagon to know where to place the
+  # surrounding trapazoids
+  if (nrow(Overlaps[[7]]) == 1) {
+    Degree <- 1
+  } else {
+    Degree <- floor((-3 + sqrt(9 + (12 * (nrow(Overlaps[[7]]) - 2)))) / 6) + 2
   }
 
-  Plot <- ggplot(Overlaps, aes_string(x = "x", y = "y", colour = ColourFactor))
-  Plot <- Plot + geom_point(size = 1)
-#  Plot <- Plot + make.region.circle(1) + make.region.circle(2) + make.region.circle(3)
-  Plot <- Plot + theme_minimal()
-  print(Plot)
+  #Function to rotate and transform a trapezoid
+  rotate.transform.trapezoid <- function(Points, Centre = c(0, 0), Angle = 0) {
 
-  return(Plot)
+    #Unless the angle is 0 or pi, need to convert unit length
+    # to hyptotenuse
+    if (! Angle %in% c(0, pi)) {
+      h <- sqrt((0.5 ^ 2) + 1)  
+      Points$x <- Points$x * h
+      Points$y <- Points$y * h
+    }
+
+    #Rotate
+    xRot <- (Points$x * cos(Angle)) + (Points$y * sin(Angle))
+    yRot <- (Points$y * cos(Angle)) - (Points$x * sin(Angle))
+    Points$x <- xRot
+    Points$y <- yRot
+
+    #Transform
+    Points$x <- Points$x + Centre[1]
+    Points$y <- Points$y + Centre[2]
+    
+    return(Points)
+    
+  }
+
+  #Place the top trapezoid
+  Trap <- place.points.trapezoid(nrow(Overlaps[[1]]), Degree)
+  x <- 0.5 - (0.5 * Degree)
+  y <- Degree
+  Trap <- rotate.transform.trapezoid(Trap, Centre = c(x, y), Angle = 0)
+  Trap <- cbind(Overlaps[[1]], Trap)
+  Points <- rbind(Points, Trap)
+  qplot(x = x, y = y, colour = Phylum, data = Points)
 
 }
