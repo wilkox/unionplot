@@ -204,12 +204,10 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     Degree <- floor((-3 + sqrt(9 + (12 * (nrow(Overlaps[[7]]) - 2)))) / 6) + 2
   }
 
-  #Place the centre hexagon
-  Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
-
   #Routine to generate a trapezoid
-  make.trapezoid <- function(OverlapIndex, BaseRow, Offset = c(0,0)) {
+  make.trapezoid <- function(OverlapIndex, BaseRow, Rotation, Offset = c(0,0)) {
     Trap <- place.points.trapezoid(nrow(Overlaps[[OverlapIndex]]), BaseRow)
+    Trap <- rotate.odd.r(Trap, Rotation)
     Trap <- convert.odd.r.to.cartesian(Trap)
     Trap$x <- Trap$x + Offset[1]
     Trap$y <- Trap$y + Offset[2]
@@ -217,88 +215,30 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     return(Trap)
   }
 
+  #Place the centre hexagon
+  Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
+
   #Place the top trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[1]]), Degree)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x + 0.5 - (0.5 * Degree)
-  Trap$y <- Trap$y + Degree + 1
-  Trap <- cbind(Overlaps[[1]], Trap)
-  Points <- rbind(Points, Trap)
+  Points <- rbind(Points, make.trapezoid(1, Degree, 6, c(0.5 - (0.5 * Degree), Degree + 1)))
 
   #Place the bottom right trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[2]]), Degree - 2)
-  Trap <- rotate.odd.r(Trap, 4)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x + Degree + 0.5
-  Trap$y <- Trap$y - 1
-  Trap <- cbind(Overlaps[[2]], Trap)
-  Points <- rbind(Points, Trap)
+  Points <- rbind(Points, make.trapezoid(2, Degree, 4, c(Degree + 0.5, -1)))
   
   #Place the bottom left trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[3]]), Degree - 2)
-  Trap <- rotate.odd.r(Trap, 2)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x - (Degree / 2) - 2
-  Trap$y <- Trap$y - Degree + 2
-  Trap <- cbind(Overlaps[[3]], Trap)
-  Points <- rbind(Points, Trap)
+  Points <- rbind(Points, make.trapezoid(3, Degree, 2, c(-(Degree / 2) - 1, -Degree)))
 
   #Place the top right trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[4]]), Degree - 2)
-  Trap <- rotate.odd.r(Trap, 5)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x + (Degree / 2) + 2
-  Trap$y <- Trap$y + Degree - 2
-  Trap <- cbind(Overlaps[[4]], Trap)
-  Points <- rbind(Points, Trap)
+  Points <- rbind(Points, make.trapezoid(4, Degree, 5, c((Degree / 2) + 1, Degree)))
 
   #Place the bottom trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[6]]), Degree)
-  Trap <- rotate.odd.r(Trap, 3)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x - 0.5 + (Degree / 2)
-  Trap$y <- Trap$y - Degree - 1
-  Trap <- cbind(Overlaps[[6]], Trap)
-  Points <- rbind(Points, Trap)
+  Points <- rbind(Points, make.trapezoid(6, Degree, 3, c(- 0.5 + (Degree / 2), - Degree - 1)))
 
   #Place the top left trapezoid
-  Trap <- place.points.trapezoid(nrow(Overlaps[[5]]), Degree - 2)
-  Trap <- rotate.odd.r(Trap, 1)
-  Trap <- convert.odd.r.to.cartesian(Trap)
-  Trap$x <- Trap$x - Degree - 1
-  Trap$y <- Trap$y + 1
-  Trap <- cbind(Overlaps[[5]], Trap)
-  Points <- rbind(Points, Trap)
-
-  Points <- Bak
+  Points <- rbind(Points, make.trapezoid(5, Degree, 1, c(- Degree - 1, 1)))
 
   #Draw dividing lines
   #Main hex
-  Hex <- data.frame(
-    q = c(
-      ((-Degree / 2) - 1),
-      (Degree / 2),
-      (Degree),
-      (Degree / 2),
-      ((-Degree / 2) - 1),
-      (-Degree),
-      ((-Degree / 2) - 1)
-    ),
-    r = c(
-      (Degree),
-      (Degree),
-      (0),
-      (- Degree),
-      (-Degree),
-      (0),
-      (Degree) 
-    )
-  )
-  Hex <- convert.odd.r.to.cartesian(Hex)
-
-  #To draw the dividing lines, we need to know the number of rows in
-  # the largest trapezoid
-  trap.rows <- function()
+  Hex <- data.frame(x = c(-Degree / 2, Degree / 2, Degree, Degree / 2, -Degree / 2, -Degree, -Degree / 2), y = c(Degree, Degree, 0, -Degree, -Degree, 0, Degree))
 
   Plot <- ggplot(Points, aes(x = x, y = y))
   Plot <- Plot + geom_point(aes(colour = Phylum))
