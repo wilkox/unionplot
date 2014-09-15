@@ -109,42 +109,32 @@ degree.of.hexagon <- function(i) {
 }
 
 #' @title Return cartesian coordinates for i points in hexagonal pack layout
+#' @description
+#' Points are placed in a spiral fashion, from centre outwards
 place.points.hexagon <- function(i) {
 
   Degree <- degree.of.hexagon(i)
 
-  #Place the points in a rastering fashing from the middle outwards
-  # Bottom row has Degree points, middle has 2Degree + 1, there are 
-  # 2Degree + 1 rows in total
-  points.in.row <- function(Row, Degree) {
-    if (Row > Degree) {
-      return(points.in.row((2 * Degree) - Row, Degree))
-    } else {
-      return(Degree + Row - 1)
-    }
-  }
-  Points <- data.frame(x = numeric(), y = numeric()) 
-  Row <- Degree
-  Position <- 1
-  for (j in 1:i) {
+  Points <- data.frame(x = numeric(), y = numeric())
+  Points <- rbind(Points, c(0, 0))
+  Degree <- degree.of.hexagon(i)
+  Directions <- list(c(1, 0), c(0.5, -1), c(-0.5, -1), c(-1, 0), c(-0.5, 1), c(0.5, 1))
 
-    x <- Position - Degree + (points.in.row(Degree, Degree) - points.in.row(Row, Degree)) / 2
-    y <- Row - Degree
-    Points <- rbind(Points, data.frame(x = x, y = y))
-
-    if (Position == points.in.row(Row, Degree)) {
-      if (Row == Degree) {
-        Row <- Row + 1 
-      } else if (Row > Degree) {
-        Row <- (2 * Degree) - Row
-      } else {
-        Row <- (2 * Degree) - Row + 1
+  for (Ring in 1:Degree) {
+    Point <- Directions[[5]] * Ring
+    for (Side in 1:6) {
+      for (SidePos in 1:Ring) {
+        Points <- rbind(Points, Point)
+        Point <- Point + Directions[[Side]]
       }
-      Position <- 1
-    } else {
-      Position <- Position + 1
     }
+    Ring <- Ring + 1
   }
+  names(Points) <- c("x", "y")
+
+  #Select only requested number of points, and reverse order
+  # for "outside-in" effect
+  Points <- Points[i:1, ]
 
   return(Points)
 
@@ -183,6 +173,10 @@ place.points.hexagon <- function(i) {
 #' print()) or saved (e.g. with ggsave()) at leisure. Note that the placement of text labels
 #' in the plot is unfortunately imprecise; you'll probably need to go in and move them in
 #' an image editing suite.
+#'
+#' @references Amit Patel's page on hexagonal grids was invaluable in creating this
+#' function, and many of the routines in here are derived from algorithms found there
+#' \url{http://www.redblobgames.com/grids/hexagons}
 draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1) {
   
   #For each group, generate list of OTUs in that group
@@ -375,7 +369,7 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
     legend.key = element_blank()
   
   )
-
+  Plot <- Plot + coord_fixed()
   return(Plot)
 
 }

@@ -40,4 +40,9 @@ There's probably already a name for this kind of plot, but I couldn't find it af
 some cursory googling so just named it "union plot". Email me if you know the actual
 name and I'll fix it.
 }
+\references{
+Amit Patel's page on hexagonal grids was invaluable in creating this
+function, and many of the routines in here are derived from algorithms found there
+\url{http://www.redblobgames.com/grids/hexagons}
+}
 

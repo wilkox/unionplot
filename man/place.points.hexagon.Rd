@@ -6,6 +6,6 @@
 place.points.hexagon(i)
 }
 \description{
-Return cartesian coordinates for i points in hexagonal pack layout
+Points are placed in a spiral fashion, from centre outwards
 }
 
