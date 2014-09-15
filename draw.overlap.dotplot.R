@@ -234,7 +234,7 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Points <- rbind(Points, make.trapezoid(6, Degree, 3, c(- 0.5 + (Degree / 2), - Degree - 1)))
 
   #Place the top left trapezoid
-  Points <- rbind(Points, make.trapezoid(5, Degree, 1, c(- Degree - 1, 1)))
+  Points <- rbind(Points, make.trapezoid(5, Degree, 1, c(- Degree - 0.5, 1)))
 
   #Draw dividing lines
   #Main hex
@@ -243,16 +243,89 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   #To draw the lines between trapezoids, we need to know how many rows are in each trapezoid
   # Blah blah arithmetic progression quadratic solve for blah
   # Where n is number of points in trapezoid, p is number in base row
+  # We use ceiling to account for unfilled rows
   trapezoid.degree <- function(n, p) {
-    return(floor((1 - (2 * p) + sqrt((((2 * p) - 1) ^ 2) + (8 * n))) / 2) + 1)
+    return(ceiling((1 - (2 * p) + sqrt((((2 * p) - 1) ^ 2) + (8 * n))) / 2))
   }
   trapezoid.degree(nrow(Overlaps[[1]]), Degree)
 
+  #Routine to add dividing line
+  add.dividing.line <- function(Start = c(0,0), OverlapIndices = c(0,0), xDir = 1, yDir = 1) {
+    x <- Start[1]
+    y <- Start[2]
+    MaxTrapDegree <- max(trapezoid.degree(nrow(Overlaps[[OverlapIndices[1]]]), Degree), trapezoid.degree(nrow(Overlaps[[OverlapIndices[2]]]), Degree))
+    xDist <- ifelse(yDir == 0, 1, 0.5)
+    xend <- x + (xDir * MaxTrapDegree * xDist) + (xDir * xDist)
+    yend <- y + (yDir * (MaxTrapDegree + 1))
+    return(data.frame(x = x, xend = xend, y = y, yend = yend))
+  }
+
+  DividingLines <- data.frame(x = numeric(), xend = numeric(), y = numeric(), yend = numeric)
+
+  #Add top left dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(-Degree / 2, Degree), c(1, 5), -1, 1))
+
+  #Add top right dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(Degree / 2, Degree), c(1, 4), 1, 1))
+
+  #Add mid right dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(Degree, 0), c(2, 4), 1, 0))
+
+  #Add bottom right dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(Degree / 2, -Degree), c(2, 6), 1, -1))
+
+  #Add bottom left dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(-Degree / 2, -Degree), c(3, 6), -1, -1))
+
+  #Add mid left dividing line
+  DividingLines <- rbind(DividingLines, add.dividing.line(c(-Degree, 0), c(3, 5), -1, 0))
+
+  #Routine to add text label
+  add.label <- function(OverlapIndex, xdir, ydir) {
+    xdist <- ifelse(ydir == 0, 1, 0.5)
+    ydist <- ifelse(xdir == 0, 1, 0.5)
+    x <- (Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree) + (5 * xdist)) * xdir * ifelse(abs(xdir * ydir) == 1, 0.75, 1)
+    y <- (Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree) + (5 * xdist)) * ydir * ifelse(abs(xdir * ydir) == 1, 0.75, 1)
+    label <- names(Overlaps)[OverlapIndex]
+    return(data.frame(label = label, x = x, y = y))
+  }
+
+  ##Text labels for each segment
+  Labels <- data.frame(label = character(), x = numeric(), y = numeric())
+
+  #Add text label for top segment
+  Labels <- rbind(Labels, add.label(1, 0, 1))
+
+  #Add text label for top right segment
+  Labels <- rbind(Labels, add.label(4, 1, 1))
+
+  #Add text label for bottom right segment
+  Labels <- rbind(Labels, add.label(2, 1, -1))
+
+  #Add text label for bottom segment
+  Labels <- rbind(Labels, add.label(6, 0, -1))
+
+  #Add text label for bottom left segment
+  Labels <- rbind(Labels, add.label(3, -1, -1))
+
+  #Add text label for top left segment
+  Labels <- rbind(Labels, add.label(5, -1, 1))
 
   Plot <- ggplot(Points, aes(x = x, y = y))
   Plot <- Plot + geom_point(aes(colour = Phylum))
   Plot <- Plot + geom_path(data = Hex)
-  Plot <- Plot + theme_classic()
+  Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
+  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y), vjust = 0.5, hjust = 0.5)
+  Plot <- Plot + theme(
+    axis.title = element_blank(),
+    axis.text = element_blank(),
+    axis.ticks = element_blank(),
+    axis.line = element_blank(),
+    panel.background = element_blank(),
+    panel.grid = element_blank(),
+    legend.key = element_blank()
+  
+  )
   Plot
 
 }
