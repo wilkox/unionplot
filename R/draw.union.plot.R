@@ -1,6 +1,9 @@
-#Return coordinates for n points, in trapezoidal layout with p points
-# in bottom row
-#Indexing is hex, odd-r
+#' @title Place points in a trapezoid
+#' @description 
+#' Return coordinates for n points, in trapezoidal layout with p points
+#' in bottom row.
+#' 
+#' Coordinate system is hex, odd-r.
 place.points.trapezoid <- function(n, p) {
 
   Points <- data.frame(q = numeric(), r = numeric()) 
@@ -27,7 +30,7 @@ place.points.trapezoid <- function(n, p) {
   
 }
 
-#Convert a hex grid in odd-r indexing to cartesian coordinates
+#' @title Convert odd-r to cartesian coordinates
 convert.odd.r.to.cartesian <- function(Points) {
   Points$x <- ifelse(Points$r %% 2 == 0, Points$q, Points$q + 0.5)
   Points$y <- Points$r
@@ -36,7 +39,11 @@ convert.odd.r.to.cartesian <- function(Points) {
   return(Points)
 }
 
-#Rotate a hex grid in odd-r indexing
+#' @title Rotate odd-r points
+#'
+#' @description
+#' Given a set of points on a hex grid in odd-r coordinates,
+#' rotate 60º widdershins about (0, 0)
 rotate.odd.r <- function(Points, Rotations = 1) {
 
   if (!Rotations == 1) {
@@ -61,42 +68,50 @@ rotate.odd.r <- function(Points, Rotations = 1) {
     
 }
 
-#Return cartesian coordinates for i points, with hexagonal pack layout
-place.points.hexagon <- function(i) {
-
-  #Determine 'degree' of pack i.e. how many rings
-  # Example:
-  #
-  #      O O O
-  #     . O O O 
-  #    . O O O O
-  #     . O O O 
-  #      . O O
-  #
-  # (15 points) has degree = 3 (three rings, three points on each side; 
-  #  outermost ring is not full, with dots marking the empty spaces)
-  #
-  # The number of points in each ring (excluding the innermost) proceeds
-  #  as an arithmetic progression: 6, 12, 18...
-  # The cumulative number of points is the sum of the progression
-  #  i.e. an arithmetic series: 6, 18, 30 ...
-  # So, the ith point is the sum of the arithmetic progression, plus change,
-  #  where the number of terms is the number of rings less one
-  # The sum of the first n terms in an arithmetic progression is given by:
-  #
-  #                   n(a_1 + a_n)
-  #           S_n =  --------------
-  #                         2
-  #
-  #  where a_j is the value of the jth term.
-  # So we rearrange and solve for n with the quadratic equation(with a few
-  #  trimmings to account for the innermost ring and 1-indexing)
-
+#' @title Determine 'degree' of hexagonal pack i.e. how many rings
+#' @description
+#'
+#'      O O O
+#'     . O O O 
+#'    . O O O O
+#'     . O O O 
+#'      . O O
+#'
+#' (15 points) has degree = 3 (three rings, three points on each side; 
+#' outermost ring is not full, with dots marking the empty spaces)
+#'
+#' The number of points in each ring (excluding the innermost) proceeds
+#' as an arithmetic progression: 6, 12, 18...
+#'
+#' The cumulative number of points is the sum of the progression
+#' i.e. an arithmetic series: 6, 18, 30 ...
+#'
+#' So, the ith point is the sum of the arithmetic progression, plus change,
+#' where the number of terms is the number of rings less one
+#'
+#' The sum of the first n terms in an arithmetic progression is given by:
+#'
+#'                   n(a_1 + a_n)
+#'           S_n =  --------------
+#'                         2
+#'
+#' where a_j is the value of the jth term.
+#'
+#' So we rearrange and solve for n with the quadratic equation(with a few
+#' trimmings to account for the innermost ring and 1-indexing)
+degree.of.hexagon <- function(i) {
   if (i == 1) {
     Degree <- 1
   } else {
     Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
+  return(Degree)
+}
+
+#' @title Return cartesian coordinates for i points in hexagonal pack layout
+place.points.hexagon <- function(i) {
+
+  Degree <- degree.of.hexagon(i)
 
   #Place the points in a rastering fashing from the middle outwards
   # Bottom row has Degree points, middle has 2Degree + 1, there are 
@@ -135,7 +150,40 @@ place.points.hexagon <- function(i) {
 
 }
 
-draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum") {
+#' @title Draw a union plot
+#' @export
+#'
+#' @description
+#'
+#' A union plot is like a Venn diagram, in that it shows the overlap between three
+#' groups. Unlike a Venn diagram, the number of overlapping units (in this case, OTUs)
+#' is not indicated by a number but by a point drawn for each OTU, which can then be
+#' coloured by a factor of interest e.g. Phylum. Also unlike a Venn diagram, the regions
+#' are not indicated by overlapping circles but by hexagons and trapezoids; the points
+#' are arranged on a hexagonal grid. This allows the regions to be resized according
+#' to the number of shared OTUs.
+#' 
+#' There's probably already a name for this kind of plot, but I couldn't find it after
+#' some cursory googling so just named it "union plot". Email me if you know the actual
+#' name and I'll fix it.
+#' 
+#' @param OTUTable an OTU table in tidy format, i.e. a data frame with at least an "OTU" 
+#' column as well as columns for the group and colour factors.
+#' @param GroupFactor a string corresponding to the name of a factor column in OTUTable, 
+#' which determines the three groups that will form the three cardinal regions in the plot.
+#' Defaults to "Sample".
+#' @param ColourFactor a string corresponding to the name of a factor column in OTUTable,
+#' which determines the colours of the points. ColourFactor is mandatory; if you don't want
+#' the points to be coloured, you should be drawing a Venn diagram instead. Defaults to
+#' "Phylum".
+#' @param Pointsize number to be passed to geom_point() as the point size. Defaults to 1.
+#'
+#' @return
+#' Returns a ggplot2 grob containing the union plot, which can then be viewed (e.g. with
+#' print()) or saved (e.g. with ggsave()) at leisure. Note that the placement of text labels
+#' in the plot is unfortunately imprecise; you'll probably need to go in and move them in
+#' an image editing suite.
+draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1) {
   
   #For each group, generate list of OTUs in that group
   message(paste0("Generate list of OTUs in each ", GroupFactor, "..."))
@@ -150,8 +198,8 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     }
   }
 
-  #Routine to identify overlap between list of groups
-  identify.overlap <- function(Groups) {
+  #Routine to identify union between list of groups
+  identify.union <- function(Groups) {
 
     #Get set intersection for groups, unless there is only one
     if (length(Groups) == 1) {
@@ -183,19 +231,15 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Groups <- levels(OTUTable[[GroupFactor]])
   Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE), .progress = "time"))
 
-  #Get lists of overlaps for the group factor
-  message(paste0("Generate lists of overlapping OTUs for each ", GroupFactor, "..."))
-  Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
+  #Get lists of unions for the group factor
+  message(paste0("Generate lists of OTUs shared between each combination of ", GroupFactor, "s..."))
+  Overlaps <- llply(Combinations, identify.union, .progress = "time")
   names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
 
   #We need the degree of the centre hexagon to know where to place the
   # surrounding trapazoids
   message("Determine degree of centre hexagon...")
-  if (nrow(Overlaps[[7]]) == 1) {
-    Degree <- 1
-  } else {
-    Degree <- floor((-3 + sqrt(9 + (12 * (nrow(Overlaps[[7]]) - 2)))) / 6) + 2
-  }
+  Degree <- degree.of.hexagon(nrow(Overlaps[[7]]))
 
   #Routine to generate a trapezoid
   make.trapezoid <- function(OverlapIndex, BaseRow, Rotation, Offset = c(0,0)) {
@@ -314,12 +358,12 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Labels <- rbind(Labels, add.label(5, -1, 1))
 
   Plot <- ggplot(Points, aes(x = x, y = y))
-  Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = 1)
+  Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = Pointsize)
   Plot <- Plot + geom_path(data = Hex)
   Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
   Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y))
-  if (length(levels(Points[ColourFactor])) <= 12) {
-    Plot <- Plot + scale_colour_brewer(palette = "Set3")
+  if (length(levels(Points[ColourFactor])) <= 8) {
+    Plot <- Plot + scale_colour_brewer(palette = "Set2")
   }
   Plot <- Plot + theme(
     axis.title = element_blank(),
@@ -335,18 +379,3 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   return(Plot)
 
 }
-
-#Load OTU table and prepare
-OTUTable <- read.tidy.dt("../residences_project/picked_OTUs_winter_forward/final_otu_table_mc2_w_taxonomy.clean.tidy.txt")
-OTUTable <- add.relative.abundance.dt(OTUTable)
-OTUTable <- as.data.frame(OTUTable)
-
-TopPhyla <- levels(collapse.taxon.table(OTUTable)$Phylum)
-OTUTable$Phylum <- factor(ifelse(OTUTable$Phylum %in% TopPhyla, as.character(OTUTable$Phylum), "Minor/Unclassified"))
-Samples <- read.tidy("../residences_project/samples/samples.txt")[c("Sample", "Type")]
-OTUTable <- merge(OTUTable, Samples, by = "Sample", all.x = TRUE)
-levels(OTUTable$Phylum) <- gsub("\\[", "", levels(OTUTable$Phylum))
-levels(OTUTable$Phylum) <- gsub("\\]", "", levels(OTUTable$Phylum))
-
-Plot <- draw.overlap.dotplot(OTUTable, "Type", "Phylum")
-Plot
