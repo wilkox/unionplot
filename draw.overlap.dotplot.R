@@ -98,8 +98,6 @@ place.points.hexagon <- function(i) {
     Degree <- floor((-3 + sqrt(9 + (12 * (i - 2)))) / 6) + 2
   }
 
-  Degree <- degree(i)
-
   #Place the points in a rastering fashing from the middle outwards
   # Bottom row has Degree points, middle has 2Degree + 1, there are 
   # 2Degree + 1 rows in total
@@ -137,18 +135,10 @@ place.points.hexagon <- function(i) {
 
 }
 
-#Load OTU table and prepare
-OTUTable <- read.tidy("../residences_project/picked_OTUs_winter_forward/final_otu_table_mc2_w_taxonomy.clean.tidy.txt")
-OTUTable <- OTUTable[which(OTUTable$OTU %in% levels(OTUTable$OTU)[1:1000]), ]
-Samples <- read.tidy("../residences_project/samples/samples.txt")[c("Sample", "Type")]
-OTUTable <- merge(OTUTable, Samples, by = "Sample", all.x = TRUE)
-
-GroupFactor <- "Type"
-ColourFactor <- "Phylum"
-
 draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum") {
   
   #For each group, generate list of OTUs in that group
+  message(paste0("Generate list of OTUs in each ", GroupFactor, "..."))
   GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU), .progress = "time")
 
   #Routine to determine intersection of >2 vectors
@@ -189,15 +179,18 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   }
 
   #Generate all combinations for the group factor
+  message(paste0("Generate all combinations of ", GroupFactor, "s..."))
   Groups <- levels(OTUTable[[GroupFactor]])
   Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE), .progress = "time"))
 
   #Get lists of overlaps for the group factor
+  message(paste0("Generate lists of overlapping OTUs for each ", GroupFactor, "..."))
   Overlaps <- llply(Combinations, identify.overlap, .progress = "time")
   names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
 
   #We need the degree of the centre hexagon to know where to place the
   # surrounding trapazoids
+  message("Determine degree of centre hexagon...")
   if (nrow(Overlaps[[7]]) == 1) {
     Degree <- 1
   } else {
@@ -215,26 +208,37 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     return(Trap)
   }
 
+  message("Generate hexagons and trapezoids...")
+
   #Place the centre hexagon
+  message(paste0(names(Overlaps)[7], "..."))
   Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
 
   #Place the top trapezoid
+  message(paste0(names(Overlaps)[1], "..."))
   Points <- rbind(Points, make.trapezoid(1, Degree, 6, c(0.5 - (0.5 * Degree), Degree + 1)))
 
   #Place the bottom right trapezoid
+  message(paste0(names(Overlaps)[2], "..."))
   Points <- rbind(Points, make.trapezoid(2, Degree, 4, c(Degree + 0.5, -1)))
   
   #Place the bottom left trapezoid
+  message(paste0(names(Overlaps)[3], "..."))
   Points <- rbind(Points, make.trapezoid(3, Degree, 2, c(-(Degree / 2) - 1, -Degree)))
 
   #Place the top right trapezoid
+  message(paste0(names(Overlaps)[4], "..."))
   Points <- rbind(Points, make.trapezoid(4, Degree, 5, c((Degree / 2) + 1, Degree)))
 
   #Place the bottom trapezoid
+  message(paste0(names(Overlaps)[6], "..."))
   Points <- rbind(Points, make.trapezoid(6, Degree, 3, c(- 0.5 + (Degree / 2), - Degree - 1)))
 
   #Place the top left trapezoid
+  message(paste0(names(Overlaps)[5], "..."))
   Points <- rbind(Points, make.trapezoid(5, Degree, 1, c(- Degree - 0.5, 1)))
+
+  message("Drawing lines and labels...")
 
   #Draw dividing lines
   #Main hex
@@ -282,10 +286,8 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
 
   #Routine to add text label
   add.label <- function(OverlapIndex, xdir, ydir) {
-    xdist <- ifelse(ydir == 0, 1, 0.5)
-    ydist <- ifelse(xdir == 0, 1, 0.5)
-    x <- (Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree) + (5 * xdist)) * xdir * ifelse(abs(xdir * ydir) == 1, 0.75, 1)
-    y <- (Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree) + (5 * xdist)) * ydir * ifelse(abs(xdir * ydir) == 1, 0.75, 1)
+    x <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * xdir * ifelse(abs(xdir * ydir) == 1, 1, 1.4)
+    y <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * ydir * ifelse(abs(xdir * ydir) == 1, 1, 1.4)
     label <- names(Overlaps)[OverlapIndex]
     return(data.frame(label = label, x = x, y = y))
   }
@@ -312,10 +314,13 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   Labels <- rbind(Labels, add.label(5, -1, 1))
 
   Plot <- ggplot(Points, aes(x = x, y = y))
-  Plot <- Plot + geom_point(aes(colour = Phylum))
+  Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = 1)
   Plot <- Plot + geom_path(data = Hex)
   Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
-  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y), vjust = 0.5, hjust = 0.5)
+  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y))
+  if (length(levels(Points[ColourFactor])) <= 12) {
+    Plot <- Plot + scale_colour_brewer(palette = "Set3")
+  }
   Plot <- Plot + theme(
     axis.title = element_blank(),
     axis.text = element_blank(),
@@ -326,6 +331,22 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
     legend.key = element_blank()
   
   )
-  Plot
+
+  return(Plot)
 
 }
+
+#Load OTU table and prepare
+OTUTable <- read.tidy.dt("../residences_project/picked_OTUs_winter_forward/final_otu_table_mc2_w_taxonomy.clean.tidy.txt")
+OTUTable <- add.relative.abundance.dt(OTUTable)
+OTUTable <- as.data.frame(OTUTable)
+
+TopPhyla <- levels(collapse.taxon.table(OTUTable)$Phylum)
+OTUTable$Phylum <- factor(ifelse(OTUTable$Phylum %in% TopPhyla, as.character(OTUTable$Phylum), "Minor/Unclassified"))
+Samples <- read.tidy("../residences_project/samples/samples.txt")[c("Sample", "Type")]
+OTUTable <- merge(OTUTable, Samples, by = "Sample", all.x = TRUE)
+levels(OTUTable$Phylum) <- gsub("\\[", "", levels(OTUTable$Phylum))
+levels(OTUTable$Phylum) <- gsub("\\]", "", levels(OTUTable$Phylum))
+
+Plot <- draw.overlap.dotplot(OTUTable, "Type", "Phylum")
+Plot
