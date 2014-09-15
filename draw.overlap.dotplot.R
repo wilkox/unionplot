@@ -240,6 +240,15 @@ draw.overlap.dotplot <- function(OTUTable, GroupFactor = "Sample", ColourFactor 
   #Main hex
   Hex <- data.frame(x = c(-Degree / 2, Degree / 2, Degree, Degree / 2, -Degree / 2, -Degree, -Degree / 2), y = c(Degree, Degree, 0, -Degree, -Degree, 0, Degree))
 
+  #To draw the lines between trapezoids, we need to know how many rows are in each trapezoid
+  # Blah blah arithmetic progression quadratic solve for blah
+  # Where n is number of points in trapezoid, p is number in base row
+  trapezoid.degree <- function(n, p) {
+    return(floor((1 - (2 * p) + sqrt((((2 * p) - 1) ^ 2) + (8 * n))) / 2) + 1)
+  }
+  trapezoid.degree(nrow(Overlaps[[1]]), Degree)
+
+
   Plot <- ggplot(Points, aes(x = x, y = y))
   Plot <- Plot + geom_point(aes(colour = Phylum))
   Plot <- Plot + geom_path(data = Hex)
