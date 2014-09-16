@@ -166,18 +166,21 @@ place.points.hexagon <- function(i) {
 #' which determines the colours of the points. ColourFactor is mandatory; if you don't want
 #' the points to be coloured, you should be drawing a Venn diagram instead. Defaults to
 #' "Phylum".
-#' @param Pointsize number to be passed to geom_point() as the point size. Defaults to 1.
+#' @param Pointsize (optional) number to be passed to geom_point() as the point size. Defaults to 1.
+#' @param Collapse (optional) integer. If > 1, each point in the plot will not represent
+#' a single OTU but this number of OTUs, with the true number rounded up to the nearest
+#' multiple of this value (there are no fractional points).
 #'
 #' @return
 #' Returns a ggplot2 grob containing the union plot, which can then be viewed (e.g. with
 #' print()) or saved (e.g. with ggsave()) at leisure. Note that the placement of text labels
-#' in the plot is unfortunately imprecise; you'll probably need to go in and move them in
+#' in the plot isn't the greatest; you'll probably need to go in and move them using
 #' an image editing suite.
 #'
 #' @references Amit Patel's page on hexagonal grids was invaluable in creating this
 #' function, and many of the routines in here are derived from algorithms found there
 #' \url{http://www.redblobgames.com/grids/hexagons}
-draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1) {
+draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1, Collapse = 1) {
   
   #For each group, generate list of OTUs in that group
   message(paste0("Generate list of OTUs in each ", GroupFactor, "..."))
@@ -212,6 +215,15 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
     #Add colour factor
     Overlap <- data.frame(OTU = Diff)
     Overlap <- unique(merge(Overlap, OTUTable[c("OTU", ColourFactor)], by = "OTU", all.x = TRUE))
+
+    #If a collapse was requested, subsample as appropriate
+    if (Collapse > 1) {
+      subsample.group <- function(Group) {
+        m <- ceiling(nrow(Group) / Collapse)
+        return(Group[sample(1:nrow(Group), m), ])
+      }
+      Overlap <- ddply(Overlap, c(ColourFactor), subsample.group)
+    }
 
     #Sort by colour factor
     Overlap <- Overlap[order(Overlap[ColourFactor]), ]
@@ -323,41 +335,50 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   DividingLines <- rbind(DividingLines, add.dividing.line(c(-Degree, 0), c(3, 5), -1, 0))
 
   #Routine to add text label
-  add.label <- function(OverlapIndex, xdir, ydir) {
-    x <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * xdir * ifelse(abs(xdir * ydir) == 1, 1, 1.4)
-    y <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * ydir * ifelse(abs(xdir * ydir) == 1, 1, 1.4)
+  add.label <- function(OverlapIndex, xdir, ydir, hjust, vjust) {
+    x <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * xdir * 2 / 3
+    y <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * ydir * ifelse(abs(xdir) == 1, 2 / 3, 1)
     label <- names(Overlaps)[OverlapIndex]
-    return(data.frame(label = label, x = x, y = y))
+    return(data.frame(label = label, x = x, y = y, hjust = hjust, vjust = vjust))
   }
 
   ##Text labels for each segment
-  Labels <- data.frame(label = character(), x = numeric(), y = numeric())
+  Labels <- data.frame(label = character(), x = numeric(), y = numeric(), hjust = numeric(), vjust = numeric())
 
   #Add text label for top segment
-  Labels <- rbind(Labels, add.label(1, 0, 1))
+  Labels <- rbind(Labels, add.label(1, 0, 1, 0.5, 0))
 
   #Add text label for top right segment
-  Labels <- rbind(Labels, add.label(4, 1, 1))
+  Labels <- rbind(Labels, add.label(4, 1, 1, 0, 0))
 
   #Add text label for bottom right segment
-  Labels <- rbind(Labels, add.label(2, 1, -1))
+  Labels <- rbind(Labels, add.label(2, 1, -1, 0, 1))
 
   #Add text label for bottom segment
-  Labels <- rbind(Labels, add.label(6, 0, -1))
+  Labels <- rbind(Labels, add.label(6, 0, -1, 0.5, 1))
 
   #Add text label for bottom left segment
-  Labels <- rbind(Labels, add.label(3, -1, -1))
+  Labels <- rbind(Labels, add.label(3, -1, -1, 1, 1))
 
   #Add text label for top left segment
-  Labels <- rbind(Labels, add.label(5, -1, 1))
+  Labels <- rbind(Labels, add.label(5, -1, 1, 1, 0))
+
+  #If a collapse was requested, add an annotation
+  if (Collapse > 1) {
+    ColourFactorDescription <- paste0(ColourFactor, " (~ ", Collapse, " OTUs)")
+  } else {
+    ColourFactorDescription <- ColourFactor
+  }
 
   Plot <- ggplot(Points, aes(x = x, y = y))
   Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = Pointsize)
   Plot <- Plot + geom_path(data = Hex)
   Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
-  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y))
+  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y, hjust = hjust, vjust = vjust))
   if (length(levels(Points[ColourFactor])) <= 8) {
-    Plot <- Plot + scale_colour_brewer(palette = "Set2")
+    Plot <- Plot + scale_colour_brewer(palette = "Set2", name = ColourFactorDescription)
+  } else {
+    Plot <- Plot + scale_colour_discrete(name = ColourFactorDescription)
   }
   Plot <- Plot + theme(
     axis.title = element_blank(),
@@ -370,6 +391,7 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   
   )
   Plot <- Plot + coord_fixed()
+
   return(Plot)
 
 }

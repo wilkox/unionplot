@@ -4,7 +4,7 @@
 \title{Draw a union plot}
 \usage{
 draw.union.plot(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum",
-  Pointsize = 1)
+  Pointsize = 1, Collapse = 1)
 }
 \arguments{
 \item{OTUTable}{an OTU table in tidy format, i.e. a data frame with at least an "OTU"
@@ -19,12 +19,16 @@ which determines the colours of the points. ColourFactor is mandatory; if you do
 the points to be coloured, you should be drawing a Venn diagram instead. Defaults to
 "Phylum".}
 
-\item{Pointsize}{number to be passed to geom_point() as the point size. Defaults to 1.}
+\item{Pointsize}{(optional) number to be passed to geom_point() as the point size. Defaults to 1.}
+
+\item{Collapse}{(optional) integer. If > 1, each point in the plot will not represent
+a single OTU but this number of OTUs, with the true number rounded up to the nearest
+multiple of this value (there are no fractional points).}
 }
 \value{
 Returns a ggplot2 grob containing the union plot, which can then be viewed (e.g. with
 print()) or saved (e.g. with ggsave()) at leisure. Note that the placement of text labels
-in the plot is unfortunately imprecise; you'll probably need to go in and move them in
+in the plot isn't the greatest; you'll probably need to go in and move them using
 an image editing suite.
 }
 \description{
