@@ -216,15 +216,6 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
     Overlap <- data.frame(OTU = Diff)
     Overlap <- unique(merge(Overlap, OTUTable[c("OTU", ColourFactor)], by = "OTU", all.x = TRUE))
 
-    #If a collapse was requested, subsample as appropriate
-    if (Collapse > 1) {
-      subsample.group <- function(Group) {
-        m <- ceiling(nrow(Group) / Collapse)
-        return(Group[sample(1:nrow(Group), m), ])
-      }
-      Overlap <- ddply(Overlap, c(ColourFactor), subsample.group)
-    }
-
     #Sort by colour factor
     Overlap <- Overlap[order(Overlap[ColourFactor]), ]
 
@@ -241,6 +232,16 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   message(paste0("Generate lists of OTUs shared between each combination of ", GroupFactor, "s..."))
   Overlaps <- llply(Combinations, identify.union, .progress = "time")
   names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
+
+  #If a collapse was requested, subsample as appropriate
+  OriginalOverlaps <- Overlaps
+  if (Collapse > 1) {
+    subsample.group <- function(Group) {
+      m <- ceiling(nrow(Group) / Collapse)
+      return(Group[sample(1:nrow(Group), m), ])
+    }
+    Overlaps <- llply(Overlaps, function(Overlap) ddply(Overlap, c(ColourFactor), subsample.group))
+  }
 
   #We need the degree of the centre hexagon to know where to place the
   # surrounding trapazoids
@@ -336,32 +337,37 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
 
   #Routine to add text label
   add.label <- function(OverlapIndex, xdir, ydir, hjust, vjust) {
-    x <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * xdir * 2 / 3
-    y <- (1 + Degree + trapezoid.degree(nrow(Overlaps[[OverlapIndex]]), Degree)) * ydir * ifelse(abs(xdir) == 1, 2 / 3, 1)
-    label <- names(Overlaps)[OverlapIndex]
+    x <- (1 + Degree) * xdir
+    y <- Degree * ydir
+    OTUs <- nrow(OriginalOverlaps[[OverlapIndex]])
+    Name <- names(Overlaps)[OverlapIndex]
+    label <- paste0(Name, " (", OTUs, ")")
     return(data.frame(label = label, x = x, y = y, hjust = hjust, vjust = vjust))
   }
 
   ##Text labels for each segment
   Labels <- data.frame(label = character(), x = numeric(), y = numeric(), hjust = numeric(), vjust = numeric())
 
+  #Add text label for centre
+  Labels <- rbind(Labels, add.label(7, 0, 1, 0.5, 1))
+
   #Add text label for top segment
   Labels <- rbind(Labels, add.label(1, 0, 1, 0.5, 0))
 
   #Add text label for top right segment
-  Labels <- rbind(Labels, add.label(4, 1, 1, 0, 0))
+  Labels <- rbind(Labels, add.label(4, 1, 0, 0, 0))
 
   #Add text label for bottom right segment
-  Labels <- rbind(Labels, add.label(2, 1, -1, 0, 1))
+  Labels <- rbind(Labels, add.label(2, 1, 0, 0, 1))
 
   #Add text label for bottom segment
   Labels <- rbind(Labels, add.label(6, 0, -1, 0.5, 1))
 
   #Add text label for bottom left segment
-  Labels <- rbind(Labels, add.label(3, -1, -1, 1, 1))
+  Labels <- rbind(Labels, add.label(3, -1, 0, 1, 1))
 
   #Add text label for top left segment
-  Labels <- rbind(Labels, add.label(5, -1, 1, 1, 0))
+  Labels <- rbind(Labels, add.label(5, -1, 0, 1, 0))
 
   #If a collapse was requested, add an annotation
   if (Collapse > 1) {
@@ -374,7 +380,7 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = Pointsize)
   Plot <- Plot + geom_path(data = Hex)
   Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
-  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y, hjust = hjust, vjust = vjust))
+  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y, hjust = hjust, vjust = vjust), family = "Helvetica-Narrow", face = "bold", size = 3)
   if (length(levels(Points[ColourFactor])) <= 8) {
     Plot <- Plot + scale_colour_brewer(palette = "Set2", name = ColourFactorDescription)
   } else {
