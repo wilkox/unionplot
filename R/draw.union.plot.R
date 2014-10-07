@@ -250,6 +250,12 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
 
   #Routine to generate a trapezoid
   make.trapezoid <- function(OverlapIndex, BaseRow, Rotation, Offset = c(0,0)) {
+
+    # Return nothing if there are no points in this overlap
+    if (nrow(Overlaps[[OverlapIndex]]) == 0) {
+      return()  
+    }
+
     Trap <- place.points.trapezoid(nrow(Overlaps[[OverlapIndex]]), BaseRow)
     Trap <- rotate.odd.r(Trap, Rotation)
     Trap <- convert.odd.r.to.cartesian(Trap)
