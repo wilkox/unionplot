@@ -377,7 +377,7 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
 
   #If a collapse was requested, add an annotation
   if (Collapse > 1) {
-    ColourFactorDescription <- paste0(ColourFactor, " (~ ", Collapse, " OTUs)")
+    ColourFactorDescription <- paste0(ColourFactor, " (1-", Collapse, " OTUs)")
   } else {
     ColourFactorDescription <- ColourFactor
   }
