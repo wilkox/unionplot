@@ -170,6 +170,7 @@ place.points.hexagon <- function(i) {
 #' @param Collapse (optional) integer. If > 1, each point in the plot will not represent
 #' a single OTU but this number of OTUs, with the true number rounded up to the nearest
 #' multiple of this value (there are no fractional points).
+#' @param silent suppress messages
 #'
 #' @return
 #' Returns a ggplot2 grob containing the union plot, which can then be viewed (e.g. with
@@ -180,11 +181,15 @@ place.points.hexagon <- function(i) {
 #' @references Amit Patel's page on hexagonal grids was invaluable in creating this
 #' function, and many of the routines in here are derived from algorithms found there
 #' \url{http://www.redblobgames.com/grids/hexagons}
-draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1, Collapse = 1) {
+draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Phylum", Pointsize = 1, Collapse = 1, silent = FALSE) {
+
+  Progress <- ifelse(silent, "none", "time")
   
   #For each group, generate list of OTUs in that group
-  message(paste0("Generate list of OTUs in each ", GroupFactor, "..."))
-  GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU), .progress = "time")
+  if (! silent) {
+    message(paste0("Generate list of OTUs in each ", GroupFactor, "..."))
+  }
+  GroupOTUs <- dlply(OTUTable, c(GroupFactor), function(x) as.character(x$OTU), .progress = Progress)
 
   #Routine to determine intersection of >2 vectors
   deep.intersect <- function(List) {
@@ -224,14 +229,18 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   }
 
   #Generate all combinations for the group factor
-  message(paste0("Generate all combinations of ", GroupFactor, "s..."))
+  if (! silent) {
+    message(paste0("Generate all combinations of ", GroupFactor, "s..."))
+  }
   Groups <- levels(OTUTable[[GroupFactor]])
-  Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE), .progress = "time"))
+  Combinations <- Reduce(c, llply(1:length(Groups), function(m) combn(Groups, m = m, simplify = FALSE), .progress = Progress))
 
   #Get lists of unions for the group factor
-  message(paste0("Generate lists of OTUs shared between each combination of ", GroupFactor, "s..."))
-  Overlaps <- llply(Combinations, identify.union, .progress = "time")
-  names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = "time"))
+  if (! silent) {
+    message(paste0("Generate lists of OTUs shared between each combination of ", GroupFactor, "s..."))
+  }
+  Overlaps <- llply(Combinations, identify.union, .progress = Progress)
+  names(Overlaps) <- unlist(llply(Combinations, function(x) paste(x, collapse = ", "), .progress = Progress))
 
   #If a collapse was requested, subsample as appropriate
   OriginalOverlaps <- Overlaps
@@ -245,7 +254,9 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
 
   #We need the degree of the centre hexagon to know where to place the
   # surrounding trapazoids
-  message("Determine degree of centre hexagon...")
+  if (! silent) {
+    message("Determine degree of centre hexagon...")
+  }
   Degree <- degree.of.hexagon(nrow(Overlaps[[7]]))
 
   #Routine to generate a trapezoid
@@ -265,37 +276,55 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
     return(Trap)
   }
 
-  message("Generate hexagons and trapezoids...")
+  if (! silent) {
+    message("Generate hexagons and trapezoids...")
+  }
 
   #Place the centre hexagon
-  message(paste0(names(Overlaps)[7], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[7], "..."))
+  }
   Points <- cbind(Overlaps[[7]], place.points.hexagon(nrow(Overlaps[[7]])))
 
   #Place the top trapezoid
-  message(paste0(names(Overlaps)[1], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[1], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(1, Degree, 6, c(0.5 - (0.5 * Degree), Degree + 1)))
 
   #Place the bottom right trapezoid
-  message(paste0(names(Overlaps)[2], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[2], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(2, Degree, 4, c(Degree + 0.5, -1)))
   
   #Place the bottom left trapezoid
-  message(paste0(names(Overlaps)[3], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[3], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(3, Degree, 2, c(-(Degree / 2) - 1, -Degree)))
 
   #Place the top right trapezoid
-  message(paste0(names(Overlaps)[4], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[4], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(4, Degree, 5, c((Degree / 2) + 1, Degree)))
 
   #Place the bottom trapezoid
-  message(paste0(names(Overlaps)[6], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[6], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(6, Degree, 3, c(- 0.5 + (Degree / 2), - Degree - 1)))
 
   #Place the top left trapezoid
-  message(paste0(names(Overlaps)[5], "..."))
+  if (! silent) {
+    message(paste0(names(Overlaps)[5], "..."))
+  }
   Points <- rbind(Points, make.trapezoid(5, Degree, 1, c(- Degree - 0.5, 1)))
 
-  message("Drawing lines and labels...")
+  if (! silent) {
+    message("Drawing lines and labels...")
+  }
 
   #Draw dividing lines
   #Main hex
