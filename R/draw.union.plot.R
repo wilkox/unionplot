@@ -415,7 +415,7 @@ draw.union.plot <- function(OTUTable, GroupFactor = "Sample", ColourFactor = "Ph
   Plot <- Plot + geom_point(aes_string(colour = ColourFactor), size = Pointsize)
   Plot <- Plot + geom_path(data = Hex)
   Plot <- Plot + geom_segment(data = DividingLines, aes(x = x, y = y, xend = xend, yend = yend))
-  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y, hjust = hjust, vjust = vjust), family = "Helvetica", face = "bold", size = 3)
+  Plot <- Plot + geom_text(data = Labels, aes(label = label, x = x, y = y, hjust = hjust, vjust = vjust), family = "Helvetica", fontface = "bold", size = 3)
   if (length(levels(Points[ColourFactor])) <= 8) {
     Plot <- Plot + scale_colour_brewer(palette = "Set2", name = ColourFactorDescription)
   } else {
