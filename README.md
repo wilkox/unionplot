@@ -1,12 +1,14 @@
-IMPORTANT NOTE: This package is fairly new and not well tested. Any bug reports
-or feature requests would be greatly appreciated.
+**IMPORTANT NOTE: This package is fairly new and not well tested. Any bug reports
+or feature requests would be greatly appreciated.**
 
 A union plot is like a Venn diagram, in that it shows the overlap between three
 groups. Unlike a Venn diagram, the number of overlapping members is not
 indicated by a number but by a point drawn for each member, which can then be
-coloured by a factor of interest. The package is designed for displaying
-microbial ecology data (OTUs in samples), but can be adapted for other
-applications.
+coloured by a factor of interest. If there are too many members to display
+easily, each point can represent more than one member (as in the example below).
+
+The package is designed for displaying microbial ecology data (OTUs in samples),
+but can be adapted for other applications. 
 
 ![Example union plot](examples/residences.png)
 
