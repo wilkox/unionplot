@@ -64,20 +64,19 @@ unionplot <- function(OTUTable, group = "Sample", colour = "Phylum", point_size 
 
   # Generate table of individual OTUs for each union
   unions <- purrr::map(unions, ~ OTUTable[OTUTable[["OTU"]] %in% ., ])
-  unions <- purrr::map(unions, ~ .[, c("OTU", colour, "Count")])
+  unions <- purrr::map(unions, ~ .[, c("OTU", colour)])
+  unions <- purrr::map(unions, ~ unique(.))
 
   # Collapse counts if a collapse was requested
   original_unions <- unions
-  if (collapse > 1) {
-    unions <- purrr::map(
-      unions,
-      ~ dplyr::mutate(., Count = ceiling(Count / collapse))
-    )
+  collapse_colour <- function(u) {
+    colours <- split(u, u[[colour]])
+    colours <- purrr::map(colours, ~ head(., ceiling(nrow(.) / collapse)))
+    dplyr::bind_rows(colours)
   }
-
-  # Convert OTU table into one-row-per-point
-  unions <- purrr::map(unions, ~ dplyr::slice(., rep(seq_len(nrow(.)), times = .[["Count"]])))
-  unions <- purrr::map(unions, ~ .[, c("OTU", colour)])
+  if (collapse > 1) {
+    unions <- purrr::map(unions, collapse_colour)
+  }
 
   # Sort by colour
   unions <- purrr::map(unions, ~ dplyr::arrange_(., colour))

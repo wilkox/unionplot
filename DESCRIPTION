@@ -1,6 +1,6 @@
 Package: unionplot
 Title: Draw union plots
-Version: 0.3.0
+Version: 0.3.0.9001
 Authors@R: person("David", "Wilkins", email = "david@wilkox.org", role = c("aut", "cre"))
 Description: Draw a union plot, a Venn-diagram like plot of the overlap between three groups.
 Depends:
