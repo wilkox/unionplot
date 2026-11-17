@@ -1,4 +1,8 @@
 
+[![Lifecycle: deprecated](https://img.shields.io/badge/lifecycle-deprecated-orange.svg)](https://lifecycle.r-lib.org/articles/stages.html#deprecated)
+
+**This package is deprecated and no longer maintained.**
+
 ![Example union plot](example.png)
 
 A union plot is like a Venn diagram, in that it shows the overlap
